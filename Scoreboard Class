@@ -1,0 +1,90 @@
+class scoreboard;
+   mailbox #(transaction) mbx; // Mailbox for communication between components
+   transaction tr; // Transaction object for storing FIFO data
+   event next; // Event for synchronization
+   
+   bit [7:0] din[$]; // Array to store the data input values
+   bit [7:0] temp; // Temporary variable for comparison
+   
+   function new(mailbox #(transaction) mbx);
+      this.mbx = mbx; // Assigning the mailbox passed as an argument to the class member variable
+   endfunction;
+  
+  // Task for monitoring the FIFO and verifying data
+  task run();
+    forever begin
+      mbx.get(tr); // Get the transaction from the mailbox
+      
+      tr.display("SCO"); // Display the transaction with a label "SCO"
+      
+      if (tr.wr == 1'b1) begin
+        din.push_front(tr.data_in); // Store the data input value in the array
+        $display("[SCO] : DATA STORED IN QUEUE : %0d", tr.data_in);
+      end
+      
+      if (tr.rd == 1'b1) begin
+        if (tr.empty == 1'b0) begin
+          temp = din.pop_back(); // Retrieve the data from the back of the array
+          
+          if (tr.data_out == temp)
+            $display("[SCO] : DATA MATCH");
+          else
+            $error("[SCO] : DATA MISMATCH");
+        end
+        else begin
+          $display("[SCO] : FIFO IS EMPTY");
+        end
+      end
+      
+      ->next; // Trigger the "next" event for synchronization
+    end
+  endtask
+endclass
+//////////////////////////////////////
+ 
+ 
+module tb;
+  monitor mon;
+  scoreboard sco;
+  mailbox #(transaction) mbx; // Mailbox for communication between components
+  event next; // Event for synchronization
+  
+  fifo_if fif(); // Virtual interface instance for connecting to the FIFO
+  
+  fifo dut (fif.clock, fif.rd, fif.wr,fif.full, fif.empty, fif.data_in, fif.data_out, fif.rst); // FIFO module instance
+  
+  initial begin
+    fif.clock <= 0; // Initialize the clock signal
+  end
+  
+  always #10 fif.clock <= ~fif.clock; // Generate clock with a period of 20 time units
+  
+  initial begin
+    mbx = new(); // Create a new mailbox
+    
+    mon = new(mbx); // Create a new monitor instance
+    sco = new(mbx); // Create a new scoreboard instance
+    
+    mon.fif = fif; // Connect the monitor to the FIFO
+    
+    mon.next = next; // Set the "next" event in the monitor
+    sco.next = next; // Set the "next" event in the scoreboard
+  end
+  
+  initial begin
+    fork
+      mon.run();
+      sco.run();
+    join
+  end
+  
+  initial begin
+    #200;
+    $finish();
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars;
+  end
+endmodule
