@@ -1,0 +1,30 @@
+class monitor;
+   virtual fifo_if fif; // Virtual interface instance for connecting to the FIFO
+   mailbox #(transaction) mbx; // Mailbox for communication between components
+   transaction tr; // Transaction object for storing FIFO data
+  
+   function new(mailbox #(transaction) mbx);
+      this.mbx = mbx; // Assigning the mailbox passed as an argument to the class member variable
+   endfunction;
+  
+  // Task for monitoring the FIFO and sending data to the mailbox
+  task run();
+    tr = new(); // Creating a new transaction object
+    
+    forever begin
+      repeat(2) @(posedge fif.clock); // Waiting for two clock cycles
+      
+      // Copying the values of FIFO signals to the transaction object
+      tr.wr = fif.wr;
+      tr.rd = fif.rd;
+      tr.data_in = fif.data_in;
+      tr.data_out = fif.data_out;
+      tr.full = fif.full;
+      tr.empty = fif.empty;
+      
+      mbx.put(tr); // Putting the transaction object into the mailbox
+      
+      tr.display("MON"); // Displaying the transaction object with a label "MON"
+    end
+  endtask
+endclass
