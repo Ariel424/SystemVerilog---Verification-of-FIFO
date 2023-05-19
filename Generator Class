@@ -1,0 +1,54 @@
+module tb;
+  generator gen;         // Instantiate the generator object
+  driver drv;            // Instantiate the driver object
+  event next;            // Declare an event named 'next'
+  mailbox #(transaction) mbx;  // Declare a mailbox object parameterized with the 'transaction' type
+  fifo_if fif();         // Instantiate the FIFO interface object
+  
+  fifo dut (
+    fif.clock,           // Connect the FIFO clock signal
+    fif.rd,              // Connect the FIFO read signal
+    fif.wr,              // Connect the FIFO write signal
+    fif.full,            // Connect the FIFO full signal
+    fif.empty,           // Connect the FIFO empty signal
+    fif.data_in,         // Connect the FIFO data input signal
+    fif.data_out,        // Connect the FIFO data output signal
+    fif.rst              // Connect the FIFO reset signal
+  );
+  
+  initial begin
+    fif.clock <= 0;      // Set the initial value of the FIFO clock to 0
+  end
+  
+  always #10 fif.clock <= ~fif.clock;  // Toggle the FIFO clock every 10 time units
+  
+  initial begin
+    mbx = new();        // Create a new mailbox object and assign it to 'mbx'
+    
+    gen = new(mbx);     // Create the generator object, passing 'mbx' as a parameter
+    gen.count = 20;     // Set the 'count' variable of the generator object to 20
+    
+    drv = new(mbx);     // Create the driver object, passing 'mbx' as a parameter
+    
+    drv.fif = fif;      // Connect the FIFO interface object to the driver object
+    gen.next = next;    // Connect the 'next' event to the generator object
+    drv.next = next;    // Connect the 'next' event to the driver object
+  end
+  
+  initial begin
+    fork
+      gen.run();        // Start the generator task
+      drv.run();        // Start the driver task
+    join
+  end
+  
+  initial begin
+    #800;               // Delay the simulation for 800 time units
+    $finish();          // Finish the simulation
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");  // Specify the VCD dump file
+    $dumpvars;              // Dump all variables for waveform tracing
+  end
+endmodule
