@@ -1,0 +1,79 @@
+class driver;
+  virtual fifo_if fif; // Virtual interface to connect with the FIFO interface
+  mailbox #(transaction) mbx; // Mailbox to communicate between generator and driver
+  transaction datac; // Transaction object to store data
+  event next; // Event to synchronize generator and driver
+ 
+  function new(mailbox #(transaction) mbx);
+    this.mbx = mbx;
+  endfunction; 
+  
+  // Reset DUT
+  task reset();
+    fif.rst <= 1'b1;
+    fif.rd <= 1'b0;
+    fif.wr <= 1'b0;
+    fif.data_in <= 0;
+    repeat(5) @(posedge fif.clock);
+    fif.rst <= 1'b0;
+  endtask
+   
+  // Applying random stimulus to DUT
+  task run();
+    forever begin
+      mbx.get(datac); // Get data from the mailbox
+      
+      datac.display("DRV"); // Display the data
+      
+      fif.rd <= datac.rd;
+      fif.wr <= datac.wr;
+      fif.data_in <= datac.data_in;
+      repeat(2) @(posedge fif.clock);
+      ->next; // Trigger the event to signal generator to proceed
+    end
+  endtask
+endclass
+ 
+module tb;
+  generator gen;
+  driver drv;
+  event next;
+  mailbox #(transaction) mbx;
+  fifo_if fif(); // Instantiate the FIFO interface
+  fifo dut (fif.clock, fif.rd, fif.wr, fif.full, fif.empty, fif.data_in, fif.data_out, fif.rst); // Instantiate the DUT
+  
+  initial begin
+    fif.clock <= 0;
+  end
+  
+  always #10 fif.clock <= ~fif.clock; // Toggle the clock every 10 time units
+  
+  initial begin
+    mbx = new(); // Create a new mailbox
+    
+    gen = new(mbx); // Instantiate the generator
+    gen.count = 20; // Set the count value for generator
+    
+    drv = new(mbx); // Instantiate the driver
+    drv.fif = fif; // Connect the virtual interface to the FIFO interface
+    gen.next = next; // Set the event for generator
+    drv.next = next; // Set the event for driver
+  end
+  
+  initial begin
+    fork
+      gen.run(); // Start the generator
+      drv.run(); // Start the driver
+    join
+  end
+  
+  initial begin
+    #800; // Wait for 800 time units
+    $finish(); // Finish the simulation
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd"); // Specify the VCD dump file
+    $dumpvars; // Dump all variables
+  end
+endmodule
