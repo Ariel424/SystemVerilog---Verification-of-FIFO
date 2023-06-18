@@ -3,7 +3,7 @@ module fifo
   output full, empty,               // Output signals: full, empty
   input [7:0] data_in,              // Input data to be written to the FIFO
   output reg [7:0] data_out,        // Output data read from the FIFO
-  input rst);                       // Reset signal
+  input rst;                       // Reset signal
  
   reg [7:0] mem [31:0];              // Memory array to store data
   reg [4:0] wr_ptr;                  // Write pointer
